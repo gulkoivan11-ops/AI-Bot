@@ -17,7 +17,7 @@ def generate_text(prompt):
             {
                 "parts": [
                     {
-                        "text": f"{prompt}\nВідповідай коротко, але в тому ж стилі як і запит до цього речення. Мову відповіді обирай як на початку запита."
+                        "text": f"{prompt}\nВідповідай коротко, але в такому ж стилі, як і запит до цього речення. Мову відповіді обирай як у запиті."
                     }
                 ]
             }
@@ -43,7 +43,8 @@ def handle_message(message):
 
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
-    update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+    json_data = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_data)
     bot.process_new_updates([update])
     return "OK", 200
 
@@ -53,5 +54,8 @@ def index():
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://gemini-telegram-bot.onrender.com/{TELEGRAM_TOKEN}")
+    bot.set_webhook(
+        url=f"https://gemini-telegram-bot.onrender.com/{TELEGRAM_TOKEN}",
+        allowed_updates=["message"]
+    )
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
