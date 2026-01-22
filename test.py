@@ -1,10 +1,9 @@
 import os
-import telebot
 import requests
 from flask import Flask, request
+import telebot
 from threading import Thread
 
-# Переменные окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -13,7 +12,7 @@ app = Flask(__name__)
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
-# Функция для генерации текста через GPT-3.5
+# Генерация текста через GPT-3.5
 def generate_text(prompt):
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -26,7 +25,7 @@ def generate_text(prompt):
         "temperature": 0.8
     }
     try:
-        r = requests.post(OPENAI_URL, json=data, headers=headers, timeout=15)
+        r = requests.post(OPENAI_URL, json=data, headers=headers, timeout=20)
         if r.status_code == 200:
             return r.json()["choices"][0]["message"]["content"]
         else:
@@ -34,10 +33,10 @@ def generate_text(prompt):
     except Exception as e:
         return f"Помилка з'єднання: {e}"
 
-# Функция для отправки ответа в Telegram (в отдельном потоке)
-def reply_gpt(message):
-    reply = generate_text(message.text)
-    bot.send_message(message.chat.id, reply)
+# Отправка ответа в Telegram в отдельном потоке
+def reply_gpt(chat_id, text):
+    response = generate_text(text)
+    bot.send_message(chat_id, response)
 
 # Команда /start
 @bot.message_handler(commands=["start"])
@@ -47,23 +46,22 @@ def start(message):
 # Обработка всех сообщений через поток
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
-    Thread(target=reply_gpt, args=(message,)).start()
+    Thread(target=reply_gpt, args=(message.chat.id, message.text)).start()
 
-# Webhook для Telegram
+# Webhook
 @app.route("/webhook", methods=["POST"])
 def webhook():
     update = telebot.types.Update.de_json(request.json)
-    bot.process_new_updates([update])
-    return "", 200
+    Thread(target=bot.process_new_updates, args=([update],)).start()
+    return "", 200  # мгновенный ответ Telegram
 
-# Проверка работы бота
+# Проверка работы
 @app.route("/")
 def index():
     return "Bot is running", 200
 
 if __name__ == "__main__":
-    # Удаляем старый webhook и ставим новый
+    # Устанавливаем webhook на Render
     bot.remove_webhook()
     bot.set_webhook(url=f"https://your-render-domain.onrender.com/webhook")
-    # Запуск Flask
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
