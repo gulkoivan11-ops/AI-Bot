@@ -4,6 +4,7 @@ import requests
 from flask import Flask, request
 from threading import Thread
 
+# Переменные окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -12,6 +13,7 @@ app = Flask(__name__)
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
+# Функция для генерации текста через GPT-3.5
 def generate_text(prompt):
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -32,31 +34,36 @@ def generate_text(prompt):
     except Exception as e:
         return f"Помилка з'єднання: {e}"
 
-@bot.message_handler(commands=["start"])
-def start(message):
-    bot.send_message(message.chat.id, "Привіт! Напиши будь-яке повідомлення")
-
+# Функция для отправки ответа в Telegram (в отдельном потоке)
 def reply_gpt(message):
     reply = generate_text(message.text)
     bot.send_message(message.chat.id, reply)
 
+# Команда /start
+@bot.message_handler(commands=["start"])
+def start(message):
+    bot.send_message(message.chat.id, "Привіт! Напиши будь-яке повідомлення")
+
+# Обработка всех сообщений через поток
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
     Thread(target=reply_gpt, args=(message,)).start()
 
+# Webhook для Telegram
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.headers.get("content-type") == "application/json":
-        update = telebot.types.Update.de_json(request.json)
-        bot.process_new_updates([update])
+    update = telebot.types.Update.de_json(request.json)
+    bot.process_new_updates([update])
     return "", 200
 
+# Проверка работы бота
 @app.route("/")
 def index():
     return "Bot is running", 200
 
 if __name__ == "__main__":
+    # Удаляем старый webhook и ставим новый
     bot.remove_webhook()
     bot.set_webhook(url=f"https://your-render-domain.onrender.com/webhook")
+    # Запуск Flask
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-
