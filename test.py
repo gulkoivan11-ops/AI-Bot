@@ -46,8 +46,9 @@ def handle_message(message):
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    update = telebot.types.Update.de_json(request.json)
-    bot.process_new_updates([update])
+    if request.headers.get("content-type") == "application/json":
+        update = telebot.types.Update.de_json(request.json)
+        bot.process_new_updates([update])
     return "", 200
 
 @app.route("/")
@@ -58,3 +59,4 @@ if __name__ == "__main__":
     bot.remove_webhook()
     bot.set_webhook(url=f"https://your-render-domain.onrender.com/webhook")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
