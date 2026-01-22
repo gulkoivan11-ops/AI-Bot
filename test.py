@@ -5,31 +5,30 @@ from flask import Flask, request
 from threading import Thread
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 def generate_text(prompt):
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": f"{prompt}\nВідповідай коротко, але в такому ж стилі, як і запит. Мову відповіді обирай як у запиті."
-                    }
-                ]
-            }
-        ]
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 500,
+        "temperature": 0.8
     }
     try:
-        r = requests.post(f"{GEMINI_URL}?key={GEMINI_API_KEY}", json=payload, timeout=15)
+        r = requests.post(OPENAI_URL, json=data, headers=headers, timeout=15)
         if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return r.json()["choices"][0]["message"]["content"]
         else:
-            return f"Помилка Gemini API: {r.status_code}"
+            return f"Помилка OpenAI API: {r.status_code}"
     except Exception as e:
         return f"Помилка з'єднання: {e}"
 
@@ -37,13 +36,13 @@ def generate_text(prompt):
 def start(message):
     bot.send_message(message.chat.id, "Привіт! Напиши будь-яке повідомлення")
 
-def reply_gemini(message):
+def reply_gpt(message):
     reply = generate_text(message.text)
     bot.send_message(message.chat.id, reply)
 
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
-    Thread(target=reply_gemini, args=(message,)).start()
+    Thread(target=reply_gpt, args=(message,)).start()
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -57,5 +56,5 @@ def index():
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://gemini-telegram-bot.onrender.com/webhook")
+    bot.set_webhook(url=f"https://your-render-domain.onrender.com/webhook")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
