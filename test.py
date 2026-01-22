@@ -2,6 +2,7 @@ import os
 import telebot
 import requests
 from flask import Flask, request
+from threading import Thread
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -17,36 +18,38 @@ def generate_text(prompt):
             {
                 "parts": [
                     {
-                        "text": f"{prompt}\nВідповідай коротко, але в такому ж стилі, як і запит до цього речення. Мову відповіді обирай як у запиті."
+                        "text": f"{prompt}\nВідповідай коротко, але в такому ж стилі, як і запит. Мову відповіді обирай як у запиті."
                     }
                 ]
             }
         ]
     }
-    r = requests.post(
-        f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-        json=payload,
-        timeout=15
-    )
-    if r.status_code == 200:
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return "Помилка отримання відповіді від ІІ"
+    try:
+        r = requests.post(f"{GEMINI_URL}?key={GEMINI_API_KEY}", json=payload, timeout=15)
+        if r.status_code == 200:
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return f"Помилка Gemini API: {r.status_code}"
+    except Exception as e:
+        return f"Помилка з'єднання: {e}"
 
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(message.chat.id, "Привіт! Напиши будь-яке повідомлення")
 
-@bot.message_handler(func=lambda m: True)
-def handle_message(message):
+def reply_gemini(message):
     reply = generate_text(message.text)
     bot.send_message(message.chat.id, reply)
 
-@app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+@bot.message_handler(func=lambda m: True)
+def handle_message(message):
+    Thread(target=reply_gemini, args=(message,)).start()
+
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    json_data = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_data)
+    update = telebot.types.Update.de_json(request.json)
     bot.process_new_updates([update])
-    return "OK", 200
+    return "", 200
 
 @app.route("/")
 def index():
@@ -54,8 +57,5 @@ def index():
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(
-        url=f"https://gemini-telegram-bot.onrender.com/{TELEGRAM_TOKEN}",
-        allowed_updates=["message"]
-    )
+    bot.set_webhook(url=f"https://gemini-telegram-bot.onrender.com/webhook")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
