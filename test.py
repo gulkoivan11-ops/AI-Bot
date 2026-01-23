@@ -18,24 +18,30 @@ def ask_gpt(chat_id, text):
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
+
     payload = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": text}],
-        "temperature": 0.7,
-        "max_tokens": 500
+        "model": "gpt-4o-mini",
+        "input": text
     }
 
     try:
-        r = requests.post(OPENAI_URL, json=payload, headers=headers, timeout=20)
+        r = requests.post(
+            "https://api.openai.com/v1/responses",
+            json=payload,
+            headers=headers,
+            timeout=20
+        )
+
         if r.status_code == 200:
-            answer = r.json()["choices"][0]["message"]["content"]
+            data = r.json()
+            answer = data["output"][0]["content"][0]["text"]
         else:
-            answer = f"Помилка OpenAI API: {r.status_code}"
+            answer = f"OpenAI error {r.status_code}: {r.text}"
+
     except Exception as e:
-        answer = f"Помилка з'єднання: {e}"
+        answer = f"Connection error: {e}"
 
     bot.send_message(chat_id, answer)
-
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -63,3 +69,4 @@ if __name__ == "__main__":
     bot.remove_webhook()
     bot.set_webhook(url=f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
