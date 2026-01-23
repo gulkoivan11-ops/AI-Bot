@@ -44,7 +44,7 @@ def ask_groq(chat_id, text):
         dialog_context[chat_id] = dialog_context[chat_id][-MAX_MESSAGES * 2 :]
 
     payload = {
-        "model": "llama-3.1-70b-versatile",
+        "model": "llama-3.1-8b-instant",
         "messages": dialog_context[chat_id],
         "temperature": 0.7
     }
@@ -108,4 +108,5 @@ if __name__ == "__main__":
         url=f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     )
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
 
